@@ -6,8 +6,6 @@
 
 Servo myServo;
 
-int Dir1Pin_A = 12;      // 제어신호 1핀
-int Dir2Pin_A = 13;      // 제어신호 2핀
 int d = 1;
 int delayMS = 50;
 int stroke = 0;
