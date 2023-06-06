@@ -10,6 +10,7 @@ int Dir1Pin_A = 12;      // 제어신호 1핀
 int Dir2Pin_A = 13;      // 제어신호 2핀
 int d = 1;
 int delayMS = 50;
+int stroke = 0;
 
 String user_html = "";
 
@@ -45,6 +46,7 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   userCommand = handleUserCommand;
+  Actuator_Status = 1;
   set_iot_server();
   iot_connect();
 
@@ -54,40 +56,68 @@ void setup() {
   myServo.attach(PIN_SERVO);
 }
 
-void loop() {
-  //Servo myServo; 
-  if (!client.connected()) {
-        iot_connect();
-    }
 
-    client.loop();
-    if ((pubInterval != 0) && (millis() - lastPublishMillis > pubInterval)) {
-        publishData();
-        lastPublishMillis = millis();
-    }
-
-  // Actuator_UP();
-  // Acutator_DOWN();
-  // delay(1000);
-}
-
-void Actuator_UP(){
+// 1층으로 보내라
+void Floor_One(){
   Actuator_Status = 1;
-  for ( int i = 1; i <90; i += d ){ 
+  for ( int i = stroke; i > 1;  i -= d ){
     SetStrokePerc(i);
     Serial.println(i);
     delay(delayMS);
+    stroke = i;
   }
 }
 
-void Acutator_DOWN(){
-  Actuator_Status = 0;
-  for ( int i = 90; i > 1;  i -= d ){
+// 2층으로 보내라
+void Floor_Two(){
+  if(Actuator_Status == 1){
+    for ( int i = stroke; i < 45; i += d ){ 
     SetStrokePerc(i);
     Serial.println(i);
     delay(delayMS);
+    stroke = i;
+    }
+  }
+  else if(Actuator_Status == 3){
+    for ( int i = stroke; i > 45; i -= d ){ 
+    SetStrokePerc(i);
+    Serial.println(i);
+    delay(delayMS);
+    stroke = i;
+    }
+  }
+  Actuator_Status = 2;
+}
+
+// 3층으로 보내라
+void Floor_Three(){
+  Actuator_Status = 3;
+  for ( int i = stroke; i <90; i += d ){ 
+    SetStrokePerc(i);
+    Serial.println(i);
+    delay(delayMS);
+    stroke = i;
   }
 }
+
+
+// void Actuator_UP(){
+//   Actuator_Status = 1;
+//   for ( int i = 1; i <90; i += d ){ 
+//     SetStrokePerc(i);
+//     Serial.println(i);
+//     delay(delayMS);
+//   }
+// }
+
+// void Acutator_DOWN(){
+//   Actuator_Status = 0;
+//   for ( int i = 90; i > 1;  i -= d ){
+//     SetStrokePerc(i);
+//     Serial.println(i);
+//     delay(delayMS);
+//   }
+// }
 
 
 void SetStrokePerc(float strokePercentage)
@@ -108,8 +138,13 @@ void publishData() {
     StaticJsonDocument<512> root;
     JsonObject data = root.createNestedObject("d");
 
-    data["actuator"] = Actuator_Status == 1 ? "up" : "down";
-
+    if(Actuator_Status == 1) {
+        data["actuator"] = "1";
+    } else if(Actuator_Status == 2){
+        data["actuator"] = "2";
+    } else if(Actuator_Status == 3){
+        data["actuator"] = "3";
+    }
     serializeJson(root, msgBuffer);
     client.publish(evtTopic, msgBuffer);
 }
@@ -118,11 +153,32 @@ void handleUserCommand(char* topic, JsonDocument* root) {
     JsonObject d = (*root)["d"];
 
     if (d.containsKey("actuator")) {
-        if (strstr(d["actuator"], "up")) {
-            Actuator_UP();
-        } else {
-            Acutator_DOWN();
+        if (strstr(d["actuator"], "1")) {
+            Floor_One();
+        } else if(strstr(d["actuator"], "2")) {
+            Floor_Two();
+        } else if(strstr(d["actuator"], "3")){
+            Floor_Three();
         }
         lastPublishMillis = -pubInterval;
     }
+
+}
+
+
+void loop() {
+  //Servo myServo; 
+  if (!client.connected()) {
+        iot_connect();
+    }
+
+    client.loop();
+    if ((pubInterval != 0) && (millis() - lastPublishMillis > pubInterval)) {
+        publishData();
+        lastPublishMillis = millis();
+    }
+
+  // Actuator_UP();
+  // Acutator_DOWN();
+  delay(10);
 }
